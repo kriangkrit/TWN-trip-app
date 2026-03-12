@@ -69,7 +69,6 @@ conn = st.connection("gsheets", type=GSheetsConnection)
 
 st.title("TAIWAN TRIP 2026")
 tab1, tab2 = st.tabs(["💰 EXPENSE", "📊 SUMMARY"])
-# เปลี่ยนชื่อคนตรงนี้ครับ
 members = ["JOY", "F"]
 categories = ["Food", "Drinks", "Transport", "Shopping", "Hotel", "Flight", "Others"]
 
@@ -81,7 +80,6 @@ try:
     if 'Note' not in df.columns: df['Note'] = ""
     if 'Is_Settled' not in df.columns: df['Is_Settled'] = False
 except:
-    # ปรับชื่อคอลัมน์เป็น Amount_TWD ให้เข้ากับไต้หวัน
     df = pd.DataFrame(columns=["Timestamp", "Item", "Amount_TWD", "Payer", "Participants", "Category", "Note", "Is_Settled"])
 
 # --- TAB 1: EXPENSE ---
@@ -94,7 +92,7 @@ with tab1:
             with c2: payer = st.selectbox("Payer", members)
             cat = st.selectbox("Category", categories)
             parts = st.multiselect("Split with", members, default=members)
-            note = st.text_input("Note (Optional)", placeholder="etc...")
+            note = st.text_input("Note (Optional)", placeholder="เพิ่มเติม...")
             settled = st.checkbox("Settled (Pre-paid)")
             if st.form_submit_button("SAVE"):
                 if item and amount is not None:
@@ -150,8 +148,9 @@ with tab2:
             st.table(cat_sum.style.format({'Amount_TWD': '{:,.0f}'}))
             st.divider()
 
-            # เรทเงินไต้หวันปกติจะประมาณ 1.05 - 1.10
-            rate = st.number_input("Rate (1 TWD = ? THB)", value=1.008, step=0.001)
+            # 🚀 แก้ไข: ปรับ Rate เป็นทศนิยม 3 ตำแหน่ง (format='%.3f' และ step=0.001)
+            rate = st.number_input("Rate (1 TWD = ? THB)", value=1.085, step=0.001, format="%.3f")
+            
             df['Is_Settled'] = df['Is_Settled'].apply(lambda x: str(x).upper() == 'TRUE' or x == True)
             bal = {m: 0.0 for m in members}
             for _, r in df[df['Is_Settled'] == False].iterrows():
