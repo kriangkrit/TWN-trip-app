@@ -64,12 +64,10 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- Connection ---
-# ใช้ ID ใหม่ที่คุณระบุมา
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1NUePBMl8q6qr72KaVpP4PQwcdQkw1zayjixQlcl_Djc/edit#gid=0"
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 st.title("HK TRIP 2026")
-# ปรับเหลือ 2 Tabs
 tab1, tab2 = st.tabs(["💰 EXPENSE", "📊 SUMMARY"])
 members = ["KK", "Charlie"]
 categories = ["Food", "Drinks", "Transport", "Shopping", "Hotel", "Flight", "Others"]
@@ -117,7 +115,83 @@ with tab1:
                     e_note = st.text_input("Note", value=r['Note'] if pd.notna(r['Note']) else "")
                     if st.form_submit_button("UPDATE"):
                         df.at[idx, 'Item'], df.at[idx, 'Amount_HKD'], df.at[idx, 'Category'], df.at[idx, 'Note'] = e_item, e_amount, e_cat, e_note
-                        conn.update(spreadsheet=SHEET_URL, worksheet=0, data=df); st.rerun()
+                        conn.update(spreadsheet=SHEET_URL, worksheet=0, data=df)
+                        st.rerun()
 
         with st.expander("DELETE"):
-            list_del = [f"{i}: {r_del['Item']}" for i, r_del in
+            list_del = [f"{i}: {r_del['Item']}" for i, r_del in df.iterrows()]
+            sel_del = st.selectbox("Choose item to remove", ["-- Select --"] + list_del)
+            if sel_del != "-- Select --" and st.button("CONFIRM DELETE", use_container_width=True):
+                idx_to_del = int(sel_del.split(":")[0])
+                conn.update(spreadsheet=SHEET_URL, worksheet=0, data=df.drop(idx_to_del).reset_index(drop=True))
+                st.rerun()
+
+        st.write("")
+        display_df = df.copy()
+        display_df['Date'] = display_df['Timestamp'].str.split().str[0]
+        final_df = display_df.sort_index(ascending=False)[['Date', 'Item', 'Amount_HKD', 'Payer', 'Category', 'Note']]
+        st.dataframe(final_df, use_container_width=True, hide_index=True)
+
+# --- TAB 2: SUMMARY ---
+with tab2:
+    if not df.empty and df['Amount_HKD'].sum() > 0:
+        cat_sum = df.groupby('Category')['Amount_HKD'].sum().reset_index()
+        cat_sum = cat_sum[cat_sum['Amount_HKD'] > 0]
+        if not cat_sum.empty:
+            fig = px.pie(cat_sum, values='Amount_HKD', names='Category', hole=0.7, color_discrete_sequence=px.colors.qualitative.Pastel)
+            fig.update_layout(showlegend=True, margin=dict(t=20, b=20, l=10, r=10), font=dict(family="Anuphan", size=14))
+            st.plotly_chart(fig, use_container_width=True)
+            st.markdown("<p style='font-weight:300;'>CATEGORY BREAKDOWN</p>", unsafe_allow_html=True)
+            st.table(cat_sum.style.format({'Amount_HKD': '{:,.0f}'}))
+            st.divider()
+
+            rate = st.number_input("Rate (1 HKD = ? THB)", value=4.5, step=0.01)
+            df['Is_Settled'] = df['Is_Settled'].apply(lambda x: str(x).upper() == 'TRUE' or x == True)
+            bal = {m: 0.0 for m in members}
+            for _, r in df[df['Is_Settled'] == False].iterrows():
+                bal[r['Payer']] += float(r['Amount_HKD'])
+                p_list = str(r['Participants']).split(", ")
+                for p in p_list: 
+                    if p in bal: bal[p] -= (float(r['Amount_HKD']) / len(p_list))
+
+            diff = bal["KK"]
+            c1, c2 = st.columns(2)
+            c1.metric("TRANSFER (HKD)", f"{abs(diff):,.2f}")
+            c2.metric("TRANSFER (THB)", f"{abs(diff)*rate:,.0f}")
+            if diff > 0.01: st.info("Charlie → KK")
+            elif diff < -0.01: st.info("KK → Charlie")
+
+            st.markdown("<hr style='border: 0.5px solid #eee; margin-top: 30px; margin-bottom: 20px;'>", unsafe_allow_html=True)
+            st.markdown("<p style='font-weight:300;'>NET SPEND PER PERSON</p>", unsafe_allow_html=True)
+            
+            usage = {m: 0.0 for m in members}
+            user_items = {m: [] for m in members}
+            for _, r in df.iterrows():
+                p_list = str(r['Participants']).split(", ")
+                share = float(r['Amount_HKD']) / len(p_list)
+                for p in p_list: 
+                    if p in usage: 
+                        usage[p] += share
+                        user_items[p].append(f"{r['Item']} ({share:,.0f})")
+            
+            usage_df = pd.DataFrame([{"Name": m, "HKD": usage[m], "THB": usage[m]*rate} for m in members])
+            st.table(usage_df.style.format({'HKD': '{:,.2f}', 'THB': '{:,.2f}'}))
+            
+            kk_items = ' • ' + ' <br> • '.join(user_items["KK"]) if user_items["KK"] else 'No items'
+            charlie_items = ' • ' + ' <br> • '.join(user_items["Charlie"]) if user_items["Charlie"] else 'No items'
+
+            st.markdown(f"""
+                <div class="mobile-flex-container">
+                    <div class="flex-item-box">
+                        <div class="member-label">KK's Items</div>
+                        <div class="item-text-centered">{kk_items}</div>
+                    </div>
+                    <div class="flex-item-box">
+                        <div class="member-label">Charlie's Items</div>
+                        <div class="item-text-centered">{charlie_items}</div>
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
+            
+    else:
+        st.info("No data.")
