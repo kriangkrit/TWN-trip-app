@@ -149,7 +149,7 @@ with tab2:
             st.divider()
 
             # 🚀 แก้ไข: ปรับ Rate เป็นทศนิยม 3 ตำแหน่ง (format='%.3f' และ step=0.001)
-            rate = st.number_input("Rate (1 TWD = ? THB)", value=1.085, step=0.001, format="%.3f")
+            rate = st.number_input("Rate (1 TWD = ? THB)", value=1.005, step=0.001, format="%.3f")
             
             df['Is_Settled'] = df['Is_Settled'].apply(lambda x: str(x).upper() == 'TRUE' or x == True)
             bal = {m: 0.0 for m in members}
