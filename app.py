@@ -64,7 +64,8 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- Connection ---
-SHEET_URL = "https://docs.google.com/spreadsheets/d/1NUePBMl8q6qr72KaVpP4PQwcdQkw1zayjixQlcl_Djc/edit#gid=0"
+# อัปเดตเป็น ID ชีตอันใหม่ของคุณ
+SHEET_URL = "https://docs.google.com/spreadsheets/d/1jM63Gi3Mh_ZGJAlNc9CA2ohlLEvuAnnSdCOvp88Nr1U/edit#gid=0"
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 st.title("HK TRIP 2026")
@@ -98,8 +99,11 @@ with tab1:
                 if item and amount is not None:
                     now_full = (datetime.utcnow() + timedelta(hours=7)).strftime("%d/%m/%Y %H:%M")
                     new_row = pd.DataFrame([{"Timestamp": now_full, "Item": item, "Amount_HKD": float(amount), "Payer": payer, "Participants": ", ".join(parts), "Category": cat, "Note": note, "Is_Settled": settled}])
-                    conn.update(spreadsheet=SHEET_URL, worksheet=0, data=pd.concat([df, new_row], ignore_index=True))
-                    st.rerun()
+                    try:
+                        conn.update(spreadsheet=SHEET_URL, worksheet=0, data=pd.concat([df, new_row], ignore_index=True))
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error updating sheet: {e}")
 
     if not df.empty:
         with st.expander("EDIT"):
