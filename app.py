@@ -94,7 +94,7 @@ with tab1:
             with c2: payer = st.selectbox("Payer", members)
             cat = st.selectbox("Category", categories)
             parts = st.multiselect("Split with", members, default=members)
-            note = st.text_input("Note (Optional)", placeholder="เพิ่มเติม...")
+            note = st.text_input("Note (Optional)", placeholder="etc...")
             settled = st.checkbox("Settled (Pre-paid)")
             if st.form_submit_button("SAVE"):
                 if item and amount is not None:
