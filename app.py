@@ -151,7 +151,7 @@ with tab2:
             st.divider()
 
             # เรทเงินไต้หวันปกติจะประมาณ 1.05 - 1.10
-            rate = st.number_input("Rate (1 TWD = ? THB)", value=1.08, step=0.01)
+            rate = st.number_input("Rate (1 TWD = ? THB)", value=1.008, step=0.001)
             df['Is_Settled'] = df['Is_Settled'].apply(lambda x: str(x).upper() == 'TRUE' or x == True)
             bal = {m: 0.0 for m in members}
             for _, r in df[df['Is_Settled'] == False].iterrows():
