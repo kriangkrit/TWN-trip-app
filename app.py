@@ -23,7 +23,6 @@ st.markdown("""
 
     h1 { font-weight: 300 !important; letter-spacing: 2px; text-align: center; text-transform: uppercase; margin-bottom: 2rem; }
     .stButton>button { border-radius: 12px; border: 0.5px solid #eee; background-color: #ffffff; transition: 0.3s; }
-    button.step-up, button.step-down { display: none !important; }
     div[data-baseweb="input"] { border-radius: 8px; border: 0.5px solid #f0f0f0; }
 
     [data-testid="stMetricValue"] { font-weight: 200 !important; font-size: 1.8rem !important; }
@@ -32,19 +31,18 @@ st.markdown("""
     
     div[data-testid="stExpander"] { border: 1px solid #f9f9f9 !important; border-radius: 12px !important; margin-bottom: 10px; }
     
-    /* 📱 Mobile Flexbox: บังคับให้ Items อยู่คู่กันไม่ตกบรรทัด */
     .mobile-flex-container {
         display: flex;
         justify-content: space-between;
         align-items: flex-start;
-        gap: 8px; /* ระยะห่างระหว่าง 2 ฝั่ง */
+        gap: 8px;
         width: 100%;
         margin-top: 15px;
     }
     .flex-item-box {
-        flex: 1; /* แบ่งครึ่งหน้าจอเท่ากัน */
+        flex: 1;
         text-align: center;
-        min-width: 0; /* ป้องกันเนื้อหาดันจนเสียรูป */
+        min-width: 0;
     }
     .member-label { 
         font-size: 11px; 
@@ -60,17 +58,19 @@ st.markdown("""
         font-size: 10px; 
         color: #999; 
         line-height: 1.4; 
-        overflow-wrap: break-word; /* ตัดคำถ้าชื่อรายการยาวเกินไป */
+        overflow-wrap: break-word;
     }
     </style>
 """, unsafe_allow_html=True)
 
 # --- Connection ---
-SHEET_URL = "https://docs.google.com/spreadsheets/d/1_lDyCMogHXKLfSetDj8QzejELtAIB4CQ6xk1LrBSZGc/edit#gid=0"
+# ใช้ ID ใหม่ที่คุณระบุมา
+SHEET_URL = "https://docs.google.com/spreadsheets/d/1NUePBMl8q6qr72KaVpP4PQwcdQkw1zayjixQlcl_Djc/edit#gid=0"
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 st.title("HK TRIP 2026")
-tab1, tab2, tab3 = st.tabs(["💰 EXPENSE", "📍 PLAN", "📊 SUMMARY"])
+# ปรับเหลือ 2 Tabs
+tab1, tab2 = st.tabs(["💰 EXPENSE", "📊 SUMMARY"])
 members = ["KK", "Charlie"]
 categories = ["Food", "Drinks", "Transport", "Shopping", "Hotel", "Flight", "Others"]
 
@@ -120,90 +120,4 @@ with tab1:
                         conn.update(spreadsheet=SHEET_URL, worksheet=0, data=df); st.rerun()
 
         with st.expander("DELETE"):
-            list_del = [f"{i}: {r_del['Item']}" for i, r_del in df.iterrows()]
-            sel_del = st.selectbox("Choose item to remove", ["-- Select --"] + list_del)
-            if sel_del != "-- Select --" and st.button("CONFIRM DELETE", use_container_width=True):
-                idx_to_del = int(sel_del.split(":")[0])
-                conn.update(spreadsheet=SHEET_URL, worksheet=0, data=df.drop(idx_to_del).reset_index(drop=True))
-                st.rerun()
-
-        st.write("")
-        display_df = df.copy()
-        display_df['Date'] = display_df['Timestamp'].str.split().str[0]
-        final_df = display_df.sort_index(ascending=False)[['Date', 'Item', 'Amount_HKD', 'Payer', 'Category', 'Note']]
-        st.dataframe(final_df, use_container_width=True, hide_index=True)
-
-# --- TAB 2: PLAN ---
-with tab2:
-    try:
-        df_plan = conn.read(spreadsheet=SHEET_URL, worksheet="1784624804", ttl=0).dropna(subset=['Day', 'Location'], how='all')
-        for day in df_plan['Day'].unique():
-            st.markdown(f"**DAY {day}**")
-            for _, r in df_plan[df_plan['Day'] == day].iterrows():
-                st.markdown(f"<p style='font-size:14px; color:#888; margin-bottom:2px;'>{r['Time']} — {r['Location']}</p>", unsafe_allow_html=True)
-    except: st.info("Check Sheets.")
-
-# --- TAB 3: SUMMARY ---
-with tab3:
-    if not df.empty and df['Amount_HKD'].sum() > 0:
-        cat_sum = df.groupby('Category')['Amount_HKD'].sum().reset_index()
-        cat_sum = cat_sum[cat_sum['Amount_HKD'] > 0]
-        if not cat_sum.empty:
-            fig = px.pie(cat_sum, values='Amount_HKD', names='Category', hole=0.7, color_discrete_sequence=px.colors.qualitative.Pastel)
-            fig.update_layout(showlegend=True, margin=dict(t=20, b=20, l=10, r=10), font=dict(family="Anuphan", size=14))
-            st.plotly_chart(fig, use_container_width=True)
-            st.markdown("<p style='font-weight:300;'>CATEGORY BREAKDOWN</p>", unsafe_allow_html=True)
-            st.table(cat_sum.style.format({'Amount_HKD': '{:,.0f}'}))
-            st.divider()
-
-            rate = st.number_input("Rate (1 HKD = ? THB)", value=4.5, step=0.01)
-            df['Is_Settled'] = df['Is_Settled'].apply(lambda x: str(x).upper() == 'TRUE' or x == True)
-            bal = {m: 0.0 for m in members}
-            for _, r in df[df['Is_Settled'] == False].iterrows():
-                bal[r['Payer']] += float(r['Amount_HKD'])
-                p_list = str(r['Participants']).split(", ")
-                for p in p_list: 
-                    if p in bal: bal[p] -= (float(r['Amount_HKD']) / len(p_list))
-
-            diff = bal["KK"]
-            c1, c2 = st.columns(2)
-            c1.metric("TRANSFER (HKD)", f"{abs(diff):,.2f}")
-            c2.metric("TRANSFER (THB)", f"{abs(diff)*rate:,.0f}")
-            if diff > 0.01: st.info("Charlie → KK")
-            elif diff < -0.01: st.info("KK → Charlie")
-
-            st.markdown("<hr style='border: 0.5px solid #eee; margin-top: 30px; margin-bottom: 20px;'>", unsafe_allow_html=True)
-            st.markdown("<p style='font-weight:300;'>NET SPEND PER PERSON</p>", unsafe_allow_html=True)
-            
-            usage = {m: 0.0 for m in members}
-            user_items = {m: [] for m in members}
-            for _, r in df.iterrows():
-                p_list = str(r['Participants']).split(", ")
-                share = float(r['Amount_HKD']) / len(p_list)
-                for p in p_list: 
-                    if p in usage: 
-                        usage[p] += share
-                        user_items[p].append(f"{r['Item']} ({share:,.0f})")
-            
-            usage_df = pd.DataFrame([{"Name": m, "HKD": usage[m], "THB": usage[m]*rate} for m in members])
-            st.table(usage_df.style.format({'HKD': '{:,.2f}', 'THB': '{:,.2f}'}))
-            
-            # 🚀 FIXED: Mobile-Friendly Item Lists (Using Custom HTML/Flexbox)
-            kk_items = ' • ' + ' <br> • '.join(user_items["KK"]) if user_items["KK"] else 'No items'
-            charlie_items = ' • ' + ' <br> • '.join(user_items["Charlie"]) if user_items["Charlie"] else 'No items'
-
-            st.markdown(f"""
-                <div class="mobile-flex-container">
-                    <div class="flex-item-box">
-                        <div class="member-label">KK's Items</div>
-                        <div class="item-text-centered">{kk_items}</div>
-                    </div>
-                    <div class="flex-item-box">
-                        <div class="member-label">Charlie's Items</div>
-                        <div class="item-text-centered">{charlie_items}</div>
-                    </div>
-                </div>
-            """, unsafe_allow_html=True)
-            
-    else:
-        st.info("No data.")
+            list_del = [f"{i}: {r_del['Item']}" for i, r_del in
